@@ -1,0 +1,331 @@
+[
+  {
+    "input": "8, 8, rook.",
+    "selectedColor": "white",
+    "expected": [
+      [
+        "R",
+        "a8"
+      ]
+    ],
+    "response": {
+      "status": "placements",
+      "commands": [
+        {
+          "type": "place",
+          "piece": "R",
+          "square": "h8"
+        }
+      ],
+      "message": "Placed a white rook on h8.",
+      "model": "openai/gpt-oss-20b"
+    },
+    "passed": false
+  },
+  {
+    "input": "8\u20138 Rook.",
+    "selectedColor": "white",
+    "expected": [
+      [
+        "R",
+        "a8"
+      ]
+    ],
+    "response": {
+      "status": "placements",
+      "commands": [
+        {
+          "type": "place",
+          "piece": "R",
+          "square": "a8"
+        }
+      ],
+      "message": "Placed a white rook on a8.",
+      "model": "openai/gpt-oss-20b"
+    },
+    "passed": true
+  },
+  {
+    "input": "88 rook",
+    "selectedColor": "white",
+    "expected": [
+      [
+        "R",
+        "a8"
+      ]
+    ],
+    "response": {
+      "status": "placements",
+      "commands": [
+        {
+          "type": "place",
+          "piece": "R",
+          "square": "a8"
+        }
+      ],
+      "message": "Placed a white rook on a8.",
+      "model": "openai/gpt-oss-20b"
+    },
+    "passed": true
+  },
+  {
+    "input": "A, a, rook.",
+    "selectedColor": "white",
+    "expected": [
+      [
+        "R",
+        "a8"
+      ]
+    ],
+    "response": {
+      "status": "placements",
+      "commands": [
+        {
+          "type": "place",
+          "piece": "R",
+          "square": "a8"
+        }
+      ],
+      "message": "Placed a white rook on a8.",
+      "model": "openai/gpt-oss-20b"
+    },
+    "passed": true
+  },
+  {
+    "input": "aa bishop",
+    "selectedColor": "white",
+    "expected": [
+      [
+        "B",
+        "a8"
+      ]
+    ],
+    "response": {
+      "status": "placements",
+      "commands": [
+        {
+          "type": "place",
+          "piece": "B",
+          "square": "a8"
+        }
+      ],
+      "message": "Placed a bishop on a8.",
+      "model": "openai/gpt-oss-20b"
+    },
+    "passed": true
+  },
+  {
+    "input": "rook eight eight",
+    "selectedColor": "black",
+    "expected": [
+      [
+        "r",
+        "a8"
+      ]
+    ],
+    "response": {
+      "status": "placements",
+      "commands": [
+        {
+          "type": "place",
+          "piece": "r",
+          "square": "a8"
+        }
+      ],
+      "message": "Placed a black rook on a8.",
+      "model": "openai/gpt-oss-20b"
+    },
+    "passed": true
+  },
+  {
+    "input": "H8 rook",
+    "selectedColor": "white",
+    "expected": [
+      [
+        "R",
+        "h8"
+      ]
+    ],
+    "response": {
+      "status": "placements",
+      "commands": [
+        {
+          "type": "place",
+          "piece": "R",
+          "square": "h8"
+        }
+      ],
+      "message": "Placed a white rook on h8.",
+      "model": "openai/gpt-oss-20b"
+    },
+    "passed": true
+  },
+  {
+    "input": "rook a1",
+    "selectedColor": "white",
+    "expected": [
+      [
+        "R",
+        "a1"
+      ]
+    ],
+    "response": {
+      "status": "placements",
+      "commands": [
+        {
+          "type": "place",
+          "piece": "R",
+          "square": "a1"
+        }
+      ],
+      "message": "Placed a white rook on a1.",
+      "model": "openai/gpt-oss-20b"
+    },
+    "passed": true
+  },
+  {
+    "input": "a7 rook",
+    "selectedColor": "black",
+    "expected": [
+      [
+        "r",
+        "a7"
+      ]
+    ],
+    "response": {
+      "status": "placements",
+      "commands": [
+        {
+          "type": "place",
+          "piece": "r",
+          "square": "a7"
+        }
+      ],
+      "message": "Placed a black rook on a7.",
+      "model": "openai/gpt-oss-20b"
+    },
+    "passed": true
+  },
+  {
+    "input": "Put a white queen on d4 and a knight on f3.",
+    "selectedColor": "black",
+    "expected": [
+      [
+        "Q",
+        "d4"
+      ],
+      [
+        "n",
+        "f3"
+      ]
+    ],
+    "response": {
+      "status": "placements",
+      "commands": [
+        {
+          "type": "place",
+          "piece": "Q",
+          "square": "d4"
+        },
+        {
+          "type": "place",
+          "piece": "n",
+          "square": "f3"
+        }
+      ],
+      "message": "Placed a white queen on d4 and a black knight on f3.",
+      "model": "openai/gpt-oss-20b"
+    },
+    "passed": true
+  },
+  {
+    "input": "Put a king on e5 and a bishop on c3.",
+    "selectedColor": "white",
+    "expected": [
+      [
+        "K",
+        "e5"
+      ],
+      [
+        "B",
+        "c3"
+      ]
+    ],
+    "response": {
+      "status": "placements",
+      "commands": [
+        {
+          "type": "place",
+          "piece": "K",
+          "square": "e5"
+        },
+        {
+          "type": "place",
+          "piece": "B",
+          "square": "c3"
+        }
+      ],
+      "message": "Placed a white king on e5 and a white bishop on c3.",
+      "model": "openai/gpt-oss-20b"
+    },
+    "passed": true
+  },
+  {
+    "input": "Put a rook somewhere.",
+    "selectedColor": "white",
+    "expected": [],
+    "response": {
+      "status": "clarification",
+      "commands": [],
+      "message": "Please specify the square for the rook or provide a list of squares where you want the rook placed.",
+      "model": "openai/gpt-oss-20b"
+    },
+    "passed": true
+  },
+  {
+    "input": "8, 8, rook.",
+    "selectedColor": "white",
+    "expected": [
+      [
+        "R",
+        "a8"
+      ]
+    ],
+    "response": {
+      "status": "placements",
+      "commands": [
+        {
+          "type": "place",
+          "piece": "R",
+          "square": "a8"
+        }
+      ],
+      "message": "Placed a white rook on a8.",
+      "model": "openai/gpt-oss-20b"
+    },
+    "passed": true
+  },
+  {
+    "input": "A, a, rook.",
+    "selectedColor": "black",
+    "expected": [
+      [
+        "r",
+        "a8"
+      ]
+    ],
+    "response": {
+      "status": "placements",
+      "commands": [
+        {
+          "type": "place",
+          "piece": "r",
+          "square": "a8"
+        }
+      ],
+      "message": "Placed a black rook on a8.",
+      "model": "openai/gpt-oss-20b"
+    },
+    "passed": true
+  }
+]
