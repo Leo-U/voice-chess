@@ -1,0 +1,14 @@
+const assert=require('node:assert/strict');require('./public/logic.js');
+const {START,parseFen,toFen,parseCommands,applyEdits}=ChessEditor;
+const sample='E2, E4, E7, E5, G1, F3, B8, C6, F1, B5, A7, A6, B5, A4, G8, F6, D2, D3, B7, B5, A4, B3, F8, E7, B1, C3, D7, D6, A2, A3, C8, B7, H2, H3, H7, H6, C1, E3, D8, D7.';
+const moves=parseCommands(sample);assert.equal(moves.length,20);
+let s=parseFen(START);applyEdits(s,moves);
+assert.equal(toFen(s),'r3k2r/1bpqbpp1/p1np1n1p/1p2p3/4P3/PBNPBN1P/1PP2PP1/R2QK2R w KQkq - 0 1');
+assert.deepEqual(parseCommands('White pawn from e2 to e4.'),[{type:'move',from:'e2',to:'e4'}]);
+assert.deepEqual(parseCommands('echo two, echo four'),[{type:'move',from:'e2',to:'e4'}]);
+assert.deepEqual(parseCommands('E 2, E 4'),[{type:'move',from:'e2',to:'e4'}]);
+assert.throws(()=>parseCommands('e2, e4, e7'),/destination is missing/);
+assert.throws(()=>parseCommands('e2, z9'));
+s=parseFen(START);const before=toFen(s);assert.throws(()=>applyEdits(s,parseCommands('e2, e4, e2, e3')),/no piece/);assert.equal(toFen(s),before);
+assert.throws(()=>applyEdits(s,parseCommands('e2, e2')),/different destination/);assert.equal(toFen(s),before);
+console.log('Coordinate sequence, placement compatibility, and atomic edit checks passed.');

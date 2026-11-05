@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import {interpret,validateInterpretation,PLACEMENT_PROMPT,INTERPRET_MODEL} from './server/interpret.mjs';
+const good={status:'placements',placements:[{piece:'king',square:'e5',color:'selected'},{piece:'bishop',square:'c3',color:'white'}],message:'Two placements.'};
+assert.deepEqual(validateInterpretation(good,'black').commands,[{type:'place',piece:'k',square:'e5'},{type:'place',piece:'B',square:'c3'}]);
+for(const p of [{piece:'dragon',square:'e5',color:'selected'},{piece:'king',square:'e9',color:'selected'},{piece:'king',square:'a1',color:'red'}])assert.throws(()=>validateInterpretation({...good,placements:[p]},'white'));
+assert.throws(()=>validateInterpretation({...good,placements:[good.placements[0],{piece:'queen',square:'e5',color:'selected'}]},'white'));
+assert.throws(()=>validateInterpretation({...good,status:'clarification'},'white'));
+assert.deepEqual(validateInterpretation({status:'clarification',placements:[],message:'Which square?'},'white').commands,[]);
+const request=(body={text:'I think we should have a king over on e5 and stick a bishop on c3.',color:'black'},origin='https://chess.example')=>new Request('https://chess.example/api/interpret',{method:'POST',headers:{'Content-Type':'application/json',Origin:origin},body:JSON.stringify(body)});
+let calls=0;
+const mocked=async(url,init)=>{calls++;assert.equal(url,'https://api.groq.com/openai/v1/chat/completions');const b=JSON.parse(init.body);assert.equal(b.model,INTERPRET_MODEL);assert.equal(b.messages[0].content,PLACEMENT_PROMPT);assert.equal(b.response_format.json_schema.strict,true);assert.equal(JSON.parse(b.messages[1].content).selectedColor,'black');return Response.json({choices:[{finish_reason:'stop',message:{content:JSON.stringify(good)}}]});};
+assert.equal((await interpret(request(),{},mocked)).status,503);
+assert.equal((await interpret(request(undefined,'https://other.example'),{GROQ_API_KEY:'test'},mocked)).status,403);
+assert.equal((await interpret(request({text:'king e5',color:'red'}),{GROQ_API_KEY:'test'},mocked)).status,400);
+const ok=await interpret(request(),{GROQ_API_KEY:'test'},mocked);assert.equal(ok.status,200);assert.equal((await ok.json()).commands[0].piece,'k');assert.equal(calls,1);
+for(const [response,status] of [[new Response('',{status:429}),502],[Response.json({choices:[{finish_reason:'length',message:{content:JSON.stringify(good)}}]}),502],[Response.json({choices:[{finish_reason:'stop',message:{content:'not json'}}]}),502]])assert.equal((await interpret(request(),{GROQ_API_KEY:'test'},async()=>response)).status,status);
+assert.equal((await interpret(request(),{GROQ_API_KEY:'test'},async()=>{throw Error('offline');})).status,504);
+console.log('Interpretation request, structured output, selected color, validation, ambiguity, limits and failure checks passed.');
