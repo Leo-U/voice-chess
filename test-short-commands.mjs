@@ -20,7 +20,7 @@ class FakeRecorder{
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
 let trackStops=0,resolveTranscript,received=[],errors=[];
 const recorder=new VoiceRecorder({ready:async()=>{},getUserMedia:async()=>({getTracks:()=>[{stop:()=>trackStops++}]}),Recorder:FakeRecorder,transcribe:()=>new Promise(r=>resolveTranscript=r),onTranscript:(text,color)=>received.push(parseCommand(text,color)),onState:()=>{},onError:e=>errors.push(e),setTimer:()=>1,clearTimer:()=>{}});
-await recorder.start('black','r');assert.equal(recorder.state,'recording');recorder.release('a');assert.equal(recorder.state,'recording');recorder.release('r');await flush();assert.equal(recorder.state,'transcribing');assert.equal(trackStops,1);
+await recorder.start('black','r');assert.equal(recorder.state,'recording');recorder.release('a');assert.equal(recorder.state,'recording');recorder.release('r');assert.equal(recorder.state,'transcribing');assert.equal(trackStops,1);
 resolveTranscript('e5 king');await flush();assert.deepEqual(received,[{type:'place',piece:'k',square:'e5'}]);assert.equal(recorder.state,'idle');assert.equal(errors.length,0);
 let resolveReady,opened=0,uploads=0;
 const cancelled=new VoiceRecorder({ready:()=>new Promise(r=>resolveReady=r),getUserMedia:async()=>{opened++;return {getTracks:()=>[]};},Recorder:FakeRecorder,transcribe:async()=>{uploads++;return 'king e5';},onTranscript:()=>assert.fail('Cancelled recording applied'),onState:()=>{},onError:e=>{throw e;},setTimer:()=>1,clearTimer:()=>{}});

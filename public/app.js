@@ -1,5 +1,4 @@
 import {VoiceRecorder} from './voice-recorder.js';
-import {watchSpeechPauses} from './speech-pauses.js';
 const {START,parseFen,toFen,parseCommands,applyEdits}=ChessEditor;
 const $=id=>document.getElementById(id),clone=v=>JSON.parse(JSON.stringify(v));
 const glyphs={K:'♚',Q:'♛',R:'♜',B:'♝',N:'♞',P:'♟',k:'♚',q:'♛',r:'♜',b:'♝',n:'♞',p:'♟'};
@@ -80,29 +79,27 @@ $('help').onclick=()=>$('guide').showModal();$('close-guide').onclick=()=>$('gui
 document.addEventListener('keydown',e=>{if(e.target.matches('input,textarea,select'))return;if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();restore(e.shiftKey?'redo':'undo');}});
 function voiceError(error){
  const message=error.name==='NotAllowedError'?'Microphone access was denied. Allow this site to use your microphone in browser settings.':error.name==='NotFoundError'?'No microphone found. Connect one and try again.':error.name==='TimeoutError'?'Transcription timed out. Please try again.':error.message;
- $('voice-state').textContent=message;feedback(message,true);
+ $('voice-state').textContent=message;feedback(message+' No pieces changed.',true);
 }
 if(navigator.mediaDevices?.getUserMedia&&window.MediaRecorder){
  voiceRecorder=new VoiceRecorder({
   getUserMedia:()=>navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true},video:false}),
   Recorder:window.MediaRecorder,
-  watchPauses:watchSpeechPauses,
   async ready(){const response=await fetch('/api/transcribe',{signal:AbortSignal.timeout(10000)});if(!response.ok)throw Error('Voice service is unavailable. Please try again later.');const config=await response.json();if(!config.ready)throw Error('Groq voice setup is pending. Typed commands are available below.');},
   async transcribe(blob,signal){const form=new FormData();form.set('audio',blob,blob.type.includes('mp4')?'command.mp4':'command.webm');const response=await fetch('/api/transcribe',{method:'POST',body:form,signal});const data=await response.json();if(!response.ok)throw Error(data.error||'Transcription failed.');return data.text;},
   interpret(text,color,signal){$('command').value=text;$('voice-state').textContent='Heard: “'+text+'” · interpreting placement…';return interpretText(text,color,signal);},
-  onTranscript(text,color,result){$('command').value=text;$('voice-state').textContent=(voiceRecorder.state==='recording'?'Still recording · ':'')+'Heard: “'+text+'”';applyInterpretation(result,text);},
+  onTranscript(text,color,result){$('command').value=text;$('voice-state').textContent='Heard: “'+text+'”';applyInterpretation(result,text);},
   onError:voiceError,
   onState(mode,capture){
    $('listen').disabled=false;
    $('listen').classList.toggle('active',mode==='recording');$('listen').setAttribute('aria-pressed',String(mode==='recording'));
    $('listen-label').textContent={idle:'Start recording',recording:'Stop recording',requesting:'Cancel',stopping:'Cancel',transcribing:'Cancel transcription',interpreting:'Cancel interpretation'}[mode];
    if(mode==='requesting')$('voice-state').textContent='Opening microphone…';
-   if(mode==='recording')$('voice-state').textContent='Recording… '+(capture.watcher?'Pause after a placement to update the board. ':'')+(capture.shortcut?'Release R to finish.':'Click Stop recording when done.');
+   if(mode==='recording')$('voice-state').textContent=capture.shortcut ? 'Recording… release R to finish.' : 'Recording… click Stop recording when done.';
    if(mode==='stopping')$('voice-state').textContent='Finishing the recording…';
    if(mode==='interpreting')$('voice-state').textContent='Interpreting your placement…';
    if(mode==='transcribing')$('voice-state').textContent='Groq is transcribing your command…';
    if(mode==='idle'&&$('voice-state').textContent==='Opening microphone…')$('voice-state').textContent='Hold R until recording starts, then speak.';
-   if(mode==='idle'&&$('voice-state').textContent==='Finishing the recording…')$('voice-state').textContent='Ready to record.';
    updateColorUI();
   }
  });
