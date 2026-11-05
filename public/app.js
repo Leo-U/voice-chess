@@ -1,10 +1,10 @@
-import {VoiceRecorder,createColorSelection} from './voice-recorder.js';
+import {VoiceRecorder} from './voice-recorder.js';
 const {START,parseFen,toFen,parseCommands,applyEdits}=ChessEditor;
 const $=id=>document.getElementById(id),clone=v=>JSON.parse(JSON.stringify(v));
 const glyphs={K:'♚',Q:'♛',R:'♜',B:'♝',N:'♞',P:'♟',k:'♚',q:'♛',r:'♜',b:'♝',n:'♞',p:'♟'};
 const names={k:'king',q:'queen',r:'rook',b:'bishop',n:'knight',p:'pawn'};
 let state=parseFen(START),selected='N',flipped=false,last=[],undo=[],redo=[];
-const colorSelection=createColorSelection();let voiceRecorder;let typedBusy=false;let typedController;
+let activeColor = null;let voiceRecorder;let typedBusy=false;let typedController;
 try{const saved=localStorage.getItem('voice-chess-groq-position');if(saved)state=parseFen(saved);}catch{}
 function pieceName(p){return (p===p.toUpperCase()?'White ':'Black ')+names[p.toLowerCase()];}
 function feedback(msg,error=false){$('feedback').textContent=msg;$('feedback').classList.toggle('error',error);}
@@ -12,19 +12,33 @@ function save(){try{localStorage.setItem('voice-chess-groq-position',toFen(state
 function render(){let b=$('board');b.replaceChildren();let ranks=flipped?[1,2,3,4,5,6,7,8]:[8,7,6,5,4,3,2,1],files=flipped?'hgfedcba':'abcdefgh';ranks.forEach((r,ri)=>[...files].forEach((f,fi)=>{let sq=f+r,p=state.board[sq],button=document.createElement('button');button.className='square'+(('abcdefgh'.indexOf(f)+r)%2===1?' dark':'')+(last.includes(sq)?' last':'');button.dataset.square=sq;button.setAttribute('aria-label',sq+(p?', '+pieceName(p):', empty'));button.title=sq+(p?' · '+pieceName(p):'');if(p){let span=document.createElement('span');span.className='piece '+(p===p.toUpperCase()?'white':'black');span.textContent=glyphs[p];button.append(span);}if(fi===0){let label=document.createElement('span');label.className='coord rank';label.textContent=r;button.append(label);}if(ri===7){let label=document.createElement('span');label.className='coord file';label.textContent=f;button.append(label);}button.onclick=()=>change(s=>{if(selected)s.board[sq]=selected;else delete s.board[sq];},[sq],selected?`${pieceName(selected)} placed on ${sq}.`:`Cleared ${sq}.`);button.oncontextmenu=e=>{e.preventDefault();change(s=>delete s.board[sq],[sq],`Cleared ${sq}.`);};b.append(button);}));$('piece-count').textContent=Object.keys(state.board).length+' pieces';$('fen').value=toFen(state);$('turn').value=state.turn;$('ep').value=state.ep;$('half').value=state.half;$('full').value=state.full;document.querySelectorAll('[data-castle]').forEach(c=>c.checked=state.castles.includes(c.dataset.castle));$('undo').disabled=!undo.length;$('redo').disabled=!redo.length;save();}
 function change(fn,squares=[],msg='Position updated.'){let next=clone(state);fn(next);if(toFen(next)!==toFen(state)){undo.push(clone(state));if(undo.length>100)undo.shift();redo=[];state=next;}last=squares;render();feedback(msg);}
 function restore(direction){let source=direction==='undo'?undo:redo,target=direction==='undo'?redo:undo;if(!source.length){feedback('Nothing to '+direction+'.');return;}target.push(clone(state));state=source.pop();last=[];render();feedback(direction==='undo'?'Last edit undone.':'Edit restored.');}
-function updateColorUI(){
- const color=colorSelection.current();
- if(selected)selected=color==='white'?selected.toUpperCase():selected.toLowerCase();
- for(const c of ['white','black'])$('color-'+c).setAttribute('aria-pressed',String(c===color));
- const capture=voiceRecorder?.capture;
- $('color-hint').textContent=capture&&voiceRecorder.state!=='idle'?`${capture.color==='white'?'White':'Black'} pieces for this recording${capture.shortcut&&['requesting','recording'].includes(voiceRecorder.state)?' · release '+capture.shortcut.toUpperCase()+' to submit':''}.`:`${color==='white'?'White':'Black'} ${colorSelection.heldKey()?'held':'selected'} · hold A for White or S for Black and speak.`;
- document.querySelectorAll('#palette button').forEach(b=>b.classList.toggle('selected',b.dataset.piece===selected));
- $('eraser').classList.toggle('selected',selected===null);
- $('selection').textContent=selected?pieceName(selected)+' selected · click a square to place':'Eraser selected · click a square to remove';
+function updateColorUI() {
+ const colorLabel = activeColor ? activeColor[0].toUpperCase() + activeColor.slice(1) : 'Choose or say a color';
+ const recording = voiceRecorder?.state === 'recording';
+ $('color-hint').textContent = (recording ? 'Listening · ' : 'Active color · ') + colorLabel;
+ for (const color of ['white', 'black']) {
+  $('color-' + color).setAttribute('aria-pressed', String(color === activeColor));
+ }
+ document.querySelectorAll('#palette button').forEach(button => {
+  button.classList.toggle('selected', button.dataset.piece === selected);
+ });
+ $('eraser').classList.toggle('selected', selected === null);
+ $('selection').textContent = selected ? pieceName(selected) + ' selected · click a square to place' : 'Eraser selected · click a square to remove';
 }
-function setSelection(p){selected=p;if(p)colorSelection.select(p===p.toUpperCase()?'white':'black');updateColorUI();}
-for(const color of ['white','black'])$('color-'+color).onclick=()=>{colorSelection.select(color);updateColorUI();};
-for(let p of 'KQRBNPkqrbnp'){let b=document.createElement('button');b.dataset.piece=p;b.title=pieceName(p);b.setAttribute('aria-label',pieceName(p));b.innerHTML=`<span class="piece ${p===p.toUpperCase()?'white':'black'}">${glyphs[p]}</span>`;b.onclick=()=>setSelection(p);$('palette').append(b);}setSelection(selected);
+function setActiveColor(color) {
+ activeColor = color;
+ if (selected) selected = color === 'white' ? selected.toUpperCase() : selected.toLowerCase();
+ updateColorUI();
+}
+function setSelection(piece) {
+ selected = piece;
+ if (piece) setActiveColor(piece === piece.toUpperCase() ? 'white' : 'black');
+ else updateColorUI();
+}
+for (const color of ['white', 'black']) {
+ $('color-' + color).onclick = () => setActiveColor(color);
+}
+for(let p of 'KQRBNPkqrbnp'){let b=document.createElement('button');b.dataset.piece=p;b.title=pieceName(p);b.setAttribute('aria-label',pieceName(p));b.innerHTML=`<span class="piece ${p===p.toUpperCase()?'white':'black'}">${glyphs[p]}</span>`;b.onclick=()=>setSelection(p);$('palette').append(b);}
 $('eraser').onclick=()=>setSelection(null);$('undo').onclick=()=>restore('undo');$('redo').onclick=()=>restore('redo');$('flip').onclick=()=>{flipped=!flipped;render();};$('clear').onclick=()=>change(s=>{s.board={};s.castles='-';s.ep='-';},[],'Board cleared. Undo to restore.');$('start').onclick=()=>change(s=>Object.assign(s,parseFen(START)),[],'Starting position restored.');
 $('turn').onchange=e=>change(s=>s.turn=e.target.value);
 document.querySelectorAll('[data-castle]').forEach(c=>c.onchange=()=>change(s=>{s.castles=[...document.querySelectorAll('[data-castle]:checked')].map(c=>c.dataset.castle).join('')||'-';}));
@@ -38,12 +52,23 @@ async function interpretText(text,color,signal){
  const response=await fetch('/api/interpret',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,color}),signal});
  const data=await response.json();if(!response.ok)throw Error(data.error||'Interpretation failed.');return data;
 }
-function applyInterpretation(result,text){
- if(result.status!=='placements'){feedback(result.message+' No pieces changed.',result.status==='clarification');return;}
- applyCommands(result.commands,text);
- if(!result.legacy)feedback('Placed: '+result.commands.map(c=>pieceName(c.piece)+' on '+c.square).join('; ')+'.');
+function applyInterpretation(result, text) {
+ if (result.status === 'color') {
+  setActiveColor(result.nextColor);
+  feedback('Active color set to ' + result.nextColor + '.');
+  return;
+ }
+ if (result.status !== 'placements') {
+  feedback(result.message + ' No pieces changed.', result.status === 'clarification');
+  return;
+ }
+ applyCommands(result.commands, text);
+ if (result.nextColor) setActiveColor(result.nextColor);
+ if (!result.legacy) {
+  feedback('Placed: ' + result.commands.map(command => pieceName(command.piece) + ' on ' + command.square).join(' · ') + '.');
+ }
 }
-async function execute(text,color=colorSelection.current()){
+async function execute(text, color = activeColor) {
  if(typedBusy||voiceRecorder&&voiceRecorder.state!=='idle'){feedback('Wait for the current command to finish, or cancel it.',true);return;}
  if(!text.trim())return;
  typedBusy=true;typedController=new AbortController();const timer=globalThis.setTimeout(()=>typedController.abort(),20000);
@@ -70,26 +95,38 @@ if(navigator.mediaDevices?.getUserMedia&&window.MediaRecorder){
   onState(mode,capture){
    $('listen').disabled=false;
    $('listen').classList.toggle('active',mode==='recording');$('listen').setAttribute('aria-pressed',String(mode==='recording'));
-   $('listen-label').textContent={idle:'Record command',recording:'Finish & transcribe',requesting:'Cancel',stopping:'Cancel',transcribing:'Cancel transcription',interpreting:'Cancel interpretation'}[mode];
+   $('listen-label').textContent={idle:'Start recording',recording:'Stop recording',requesting:'Cancel',stopping:'Cancel',transcribing:'Cancel transcription',interpreting:'Cancel interpretation'}[mode];
    if(mode==='requesting')$('voice-state').textContent='Opening microphone…';
-   if(mode==='recording')$('voice-state').textContent=capture.shortcut?'Recording… release '+capture.shortcut.toUpperCase()+' to place '+capture.color+' pieces.':'Recording… click Finish & transcribe when done.';
+   if(mode==='recording')$('voice-state').textContent=capture.shortcut ? 'Recording… release Space to finish.' : 'Recording… click Stop recording when done.';
    if(mode==='stopping')$('voice-state').textContent='Finishing the recording…';
    if(mode==='interpreting')$('voice-state').textContent='Interpreting your placement…';
    if(mode==='transcribing')$('voice-state').textContent='Groq is transcribing your command…';
-   if(mode==='idle'&&$('voice-state').textContent==='Opening microphone…')$('voice-state').textContent='Hold A or S until recording starts, then speak.';
+   if(mode==='idle'&&$('voice-state').textContent==='Opening microphone…')$('voice-state').textContent='Hold Space until recording starts, then speak.';
    updateColorUI();
   }
  });
- $('listen').onclick=()=>{if(voiceRecorder.state==='idle')voiceRecorder.start(colorSelection.current());else if(voiceRecorder.state==='recording')voiceRecorder.finish();else{voiceRecorder.cancel();$('voice-state').textContent='Cancelled. Ready to record again.';}};
+ $('listen').onclick=()=>{if(voiceRecorder.state==='idle')voiceRecorder.start(activeColor);else if(voiceRecorder.state==='recording')voiceRecorder.finish();else{voiceRecorder.cancel();$('voice-state').textContent='Cancelled. Ready to record again.';}};
  fetch('/api/transcribe').then(r=>r.ok?r.json():Promise.reject()).then(config=>{if(voiceRecorder.state==='idle')$('voice-state').textContent=config.ready?'Groq Whisper Large V3 · ready to record.':'Groq voice setup is pending. Typed commands are available below.';}).catch(()=>{if(voiceRecorder.state==='idle')$('voice-state').textContent='Voice service unavailable. Typed commands are available below.';});
 }else{$('listen').disabled=true;$('listen-label').textContent='Recording unavailable';$('voice-state').textContent='Open this site in a browser with microphone recording support.';}
-function typingTarget(target){return !!target.closest?.('input,textarea,select,[contenteditable="true"]');}
-document.addEventListener('keydown',event=>{
- const key=event.key.toLowerCase();if(!['a','s'].includes(key)||event.ctrlKey||event.metaKey||event.altKey||event.repeat||typingTarget(event.target)||$('guide').open)return;
- event.preventDefault();colorSelection.hold(key);updateColorUI();
- if(!typedBusy&&voiceRecorder?.state==='idle')voiceRecorder.start(colorSelection.current(),key);
+function spaceKey(event) {
+ return event.code === 'Space' || event.key === ' ';
+}
+document.addEventListener('keydown', event => {
+ if (!spaceKey(event) || event.ctrlKey || event.metaKey || event.altKey || $('guide').open ||
+     event.target.closest?.('input, textarea, select, [contenteditable]:not([contenteditable="false"]), button:not(#listen), a, summary')) return;
+ if (typedBusy || !voiceRecorder) return;
+ if (voiceRecorder.state === 'idle' || voiceRecorder.capture?.shortcut === 'Space') {
+  event.preventDefault();
+ }
+ if (!event.repeat && voiceRecorder.state === 'idle') voiceRecorder.start(activeColor, 'Space');
 });
-document.addEventListener('keyup',event=>{const key=event.key.toLowerCase();if(!['a','s'].includes(key))return;voiceRecorder?.release(key);colorSelection.release(key);updateColorUI();});
-function releaseKeys(){const key=voiceRecorder?.capture?.shortcut;if(key)voiceRecorder.release(key);colorSelection.reset();updateColorUI();}
+document.addEventListener('keyup', event => {
+ if (!spaceKey(event) || voiceRecorder?.capture?.shortcut !== 'Space') return;
+ event.preventDefault();
+ voiceRecorder.release('Space');
+});
+function releaseKeys() {
+ voiceRecorder?.release('Space');
+}
 window.addEventListener('blur',releaseKeys);document.addEventListener('visibilitychange',()=>{if(document.hidden)releaseKeys();});
 window.addEventListener('pagehide',()=>{voiceRecorder?.dispose();typedController?.abort();});updateColorUI();render();

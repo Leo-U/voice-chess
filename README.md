@@ -10,9 +10,9 @@ Record up to 60 seconds, then click Finish & transcribe. Audio is sent to Groq; 
 
 ## Short placement and color controls
 
-Say `king e5` or `e5 king`; both place a piece using the selected color. White and Black buttons set the persistent color. Hold A for White or S for Black to record, then release to transcribe and place. The color is captured when recording begins and remains fixed through transcription. Shortcuts are ignored in text fields and while the command guide is open. Leaving the window releases the shortcut; unloading the page cancels recording.
+Click Start recording and Stop recording, or hold Space and release to submit. The shortcut works outside text fields and ordinary interactive controls. Leaving the window releases a held Space key; unloading the page cancels recording.
 
-Explicit colors override the selection. Color buttons and shortcuts also set the palette color. Typed commands use the current selection. Early key release before recording begins cancels without uploading audio.
+Set an active color by saying “let’s do black next” or “switch to white”, or by clicking a color. The active color persists for later commands on the page. A color named for one piece overrides the active color for that piece alone. If no color is established, a placement needs an explicit color. A recording uses the active color at its start and applies any spoken switches in order. Placements apply after recording ends.
 
 ## Commands
 
@@ -44,6 +44,6 @@ The pre-LLM baseline remains saved as Site version 5 (commit `105d5ad473eeada4c1
 
 Completed voice recordings use Whisper transcription followed by `POST /api/interpret`. Typed placements use the same interpreter. All placements, including shorthand, are interpreted by Groq-hosted `openai/gpt-oss-20b` with strict JSON schema output, using the existing server-only `GROQ_API_KEY`. This does not use the OpenAI API or require another credential. Groq account limits apply; there is no fallback provider. The actual natural language instructions are exported as `PLACEMENT_PROMPT` in `server/interpret.mjs`.
 
-Unrelated words are ignored; explicit colors override the selected color. Incomplete or ambiguous placements ask for clarification without board changes. Each request is independent, without prior utterance or board context. Arbitrary positions are allowed. Model output is validated before applying a batch atomically; a batch can be undone once. Exact existing move/remove/editor commands remain on the local parser. No live placement or continuous audio streaming was added.
+Unrelated words are ignored; explicit colors override the selected color. Incomplete or ambiguous placements ask for clarification without board changes. Each request receives the current active color and the new text, without prior utterances or board context. Arbitrary positions are allowed. Model output is validated before applying a batch atomically; a batch can be undone once. Exact existing move/remove/editor commands remain on the local parser. No live placement or continuous audio streaming was added.
 
 Interpretation has an 18-second server deadline and 20-second client deadline, separately from transcription. Cancel during either stage ignores late results. Tests: `node test-interpret.mjs` and `node test-interpret-recorder.mjs`. Manual acceptance cases include the recorded black shorthand batch, conversational fillers, self-corrections, selected/explicit colors, ambiguous instructions, and non-placement chatter.

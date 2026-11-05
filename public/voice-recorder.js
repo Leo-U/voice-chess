@@ -93,14 +93,3 @@ export class VoiceRecorder {
   }
   dispose(){this.cancel();}
 }
-export function createColorSelection(){
-  let chosen='white';const held=[];
-  return {
-    current:()=>held.length?({a:'white',s:'black'}[held[held.length-1]]):chosen,
-    select(color){chosen=color;},
-    hold(key){if(!held.includes(key))held.push(key);},
-    release(key){const index=held.indexOf(key);if(index>=0)held.splice(index,1);},
-    reset(){held.length=0;},
-    heldKey:()=>held[held.length-1]||null
-  };
-}
