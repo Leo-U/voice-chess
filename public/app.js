@@ -65,7 +65,10 @@ function applyInterpretation(result, text) {
  applyCommands(result.commands, text);
  if (result.nextColor) setActiveColor(result.nextColor);
  if (!result.legacy) {
-  feedback('Placed: ' + result.commands.map(command => pieceName(command.piece) + ' on ' + command.square).join(' · ') + '.');
+  const descriptions = result.commands.map(command => command.type === 'remove'
+   ? 'Cleared ' + command.square
+   : 'Placed ' + pieceName(command.piece) + ' on ' + command.square);
+  feedback(descriptions.join(' · ') + '.');
  }
 }
 async function execute(text, color = activeColor) {
