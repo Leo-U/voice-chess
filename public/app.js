@@ -1,6 +1,19 @@
 import {VoiceRecorder} from './voice-recorder.js';
 const {START,parseFen,toFen,parseCommands,applyEdits}=ChessEditor;
 const $=id=>document.getElementById(id),clone=v=>JSON.parse(JSON.stringify(v));
+const themeRoot = document.documentElement;
+const themeToggle = $('theme-toggle');
+function updateThemeLabel() {
+ themeToggle.textContent = themeRoot.dataset.theme === 'light' ? 'Dark mode' : 'Light mode';
+}
+updateThemeLabel();
+themeToggle.onclick = () => {
+ const theme = themeRoot.dataset.theme === 'light' ? 'dark' : 'light';
+ themeRoot.dataset.theme = theme;
+ updateThemeLabel();
+ document.querySelector('meta[name="theme-color"]').content = getComputedStyle(themeRoot).getPropertyValue('--paper').trim();
+ try { localStorage.setItem('voice-chess-theme', theme); } catch {}
+};
 const glyphs={K:'♚',Q:'♛',R:'♜',B:'♝',N:'♞',P:'♟',k:'♚',q:'♛',r:'♜',b:'♝',n:'♞',p:'♟'};
 const names={k:'king',q:'queen',r:'rook',b:'bishop',n:'knight',p:'pawn'};
 const recordShortcut = 'r';
@@ -9,7 +22,7 @@ let activeColor = null;let voiceRecorder;let typedBusy=false;let typedController
 try{const saved=localStorage.getItem('voice-chess-groq-position');if(saved)state=parseFen(saved);}catch{}
 function pieceName(p){return (p===p.toUpperCase()?'White ':'Black ')+names[p.toLowerCase()];}
 function feedback(msg,error=false){$('feedback').textContent=msg;$('feedback').classList.toggle('error',error);}
-function save(){try{localStorage.setItem('voice-chess-groq-position',toFen(state));}catch{document.querySelector('.local').textContent='Position available this session';}}
+function save(){try{localStorage.setItem('voice-chess-groq-position',toFen(state));}catch{$('fen-status').textContent='Position available this session.';}}
 function render(){let b=$('board');b.replaceChildren();let ranks=flipped?[1,2,3,4,5,6,7,8]:[8,7,6,5,4,3,2,1],files=flipped?'hgfedcba':'abcdefgh';ranks.forEach((r,ri)=>[...files].forEach((f,fi)=>{let sq=f+r,p=state.board[sq],button=document.createElement('button');button.className='square'+(('abcdefgh'.indexOf(f)+r)%2===1?' dark':'')+(last.includes(sq)?' last':'');button.dataset.square=sq;button.setAttribute('aria-label',sq+(p?', '+pieceName(p):', empty'));button.title=sq+(p?' · '+pieceName(p):'');if(p){let span=document.createElement('span');span.className='piece '+(p===p.toUpperCase()?'white':'black');span.textContent=glyphs[p];button.append(span);}if(fi===0){let label=document.createElement('span');label.className='coord rank';label.textContent=r;button.append(label);}if(ri===7){let label=document.createElement('span');label.className='coord file';label.textContent=f;button.append(label);}button.onclick=()=>change(s=>{if(selected)s.board[sq]=selected;else delete s.board[sq];},[sq],selected?`${pieceName(selected)} placed on ${sq}.`:`Cleared ${sq}.`);button.oncontextmenu=e=>{e.preventDefault();change(s=>delete s.board[sq],[sq],`Cleared ${sq}.`);};b.append(button);}));$('piece-count').textContent=Object.keys(state.board).length+' pieces';$('fen').value=toFen(state);$('turn').value=state.turn;$('ep').value=state.ep;$('half').value=state.half;$('full').value=state.full;document.querySelectorAll('[data-castle]').forEach(c=>c.checked=state.castles.includes(c.dataset.castle));$('undo').disabled=!undo.length;$('redo').disabled=!redo.length;save();}
 function change(fn,squares=[],msg='Position updated.'){let next=clone(state);fn(next);if(toFen(next)!==toFen(state)){undo.push(clone(state));if(undo.length>100)undo.shift();redo=[];state=next;}last=squares;render();feedback(msg);}
 function restore(direction){let source=direction==='undo'?undo:redo,target=direction==='undo'?redo:undo;if(!source.length){feedback('Nothing to '+direction+'.');return;}target.push(clone(state));state=source.pop();last=[];render();feedback(direction==='undo'?'Last edit undone.':'Edit restored.');}
