@@ -3,6 +3,7 @@ const {START,parseFen,toFen,parseCommands,applyEdits}=ChessEditor;
 const $=id=>document.getElementById(id),clone=v=>JSON.parse(JSON.stringify(v));
 const glyphs={K:'♚',Q:'♛',R:'♜',B:'♝',N:'♞',P:'♟',k:'♚',q:'♛',r:'♜',b:'♝',n:'♞',p:'♟'};
 const names={k:'king',q:'queen',r:'rook',b:'bishop',n:'knight',p:'pawn'};
+const recordShortcut = 'r';
 let state=parseFen(START),selected='N',flipped=false,last=[],undo=[],redo=[];
 let activeColor = null;let voiceRecorder;let typedBusy=false;let typedController;
 try{const saved=localStorage.getItem('voice-chess-groq-position');if(saved)state=parseFen(saved);}catch{}
@@ -13,12 +14,9 @@ function render(){let b=$('board');b.replaceChildren();let ranks=flipped?[1,2,3,
 function change(fn,squares=[],msg='Position updated.'){let next=clone(state);fn(next);if(toFen(next)!==toFen(state)){undo.push(clone(state));if(undo.length>100)undo.shift();redo=[];state=next;}last=squares;render();feedback(msg);}
 function restore(direction){let source=direction==='undo'?undo:redo,target=direction==='undo'?redo:undo;if(!source.length){feedback('Nothing to '+direction+'.');return;}target.push(clone(state));state=source.pop();last=[];render();feedback(direction==='undo'?'Last edit undone.':'Edit restored.');}
 function updateColorUI() {
- const colorLabel = activeColor ? activeColor[0].toUpperCase() + activeColor.slice(1) : 'Choose or say a color';
+ const colorLabel = activeColor ? activeColor[0].toUpperCase() + activeColor.slice(1) : 'Say white or black';
  const recording = voiceRecorder?.state === 'recording';
  $('color-hint').textContent = (recording ? 'Listening · ' : 'Active color · ') + colorLabel;
- for (const color of ['white', 'black']) {
-  $('color-' + color).setAttribute('aria-pressed', String(color === activeColor));
- }
  document.querySelectorAll('#palette button').forEach(button => {
   button.classList.toggle('selected', button.dataset.piece === selected);
  });
@@ -34,9 +32,6 @@ function setSelection(piece) {
  selected = piece;
  if (piece) setActiveColor(piece === piece.toUpperCase() ? 'white' : 'black');
  else updateColorUI();
-}
-for (const color of ['white', 'black']) {
- $('color-' + color).onclick = () => setActiveColor(color);
 }
 for(let p of 'KQRBNPkqrbnp'){let b=document.createElement('button');b.dataset.piece=p;b.title=pieceName(p);b.setAttribute('aria-label',pieceName(p));b.innerHTML=`<span class="piece ${p===p.toUpperCase()?'white':'black'}">${glyphs[p]}</span>`;b.onclick=()=>setSelection(p);$('palette').append(b);}
 $('eraser').onclick=()=>setSelection(null);$('undo').onclick=()=>restore('undo');$('redo').onclick=()=>restore('redo');$('flip').onclick=()=>{flipped=!flipped;render();};$('clear').onclick=()=>change(s=>{s.board={};s.castles='-';s.ep='-';},[],'Board cleared. Undo to restore.');$('start').onclick=()=>change(s=>Object.assign(s,parseFen(START)),[],'Starting position restored.');
@@ -100,36 +95,30 @@ if(navigator.mediaDevices?.getUserMedia&&window.MediaRecorder){
    $('listen').classList.toggle('active',mode==='recording');$('listen').setAttribute('aria-pressed',String(mode==='recording'));
    $('listen-label').textContent={idle:'Start recording',recording:'Stop recording',requesting:'Cancel',stopping:'Cancel',transcribing:'Cancel transcription',interpreting:'Cancel interpretation'}[mode];
    if(mode==='requesting')$('voice-state').textContent='Opening microphone…';
-   if(mode==='recording')$('voice-state').textContent=capture.shortcut ? 'Recording… release Space to finish.' : 'Recording… click Stop recording when done.';
+   if(mode==='recording')$('voice-state').textContent=capture.shortcut ? 'Recording… release R to finish.' : 'Recording… click Stop recording when done.';
    if(mode==='stopping')$('voice-state').textContent='Finishing the recording…';
    if(mode==='interpreting')$('voice-state').textContent='Interpreting your placement…';
    if(mode==='transcribing')$('voice-state').textContent='Groq is transcribing your command…';
-   if(mode==='idle'&&$('voice-state').textContent==='Opening microphone…')$('voice-state').textContent='Hold Space until recording starts, then speak.';
+   if(mode==='idle'&&$('voice-state').textContent==='Opening microphone…')$('voice-state').textContent='Hold R until recording starts, then speak.';
    updateColorUI();
   }
  });
  $('listen').onclick=()=>{if(voiceRecorder.state==='idle')voiceRecorder.start(activeColor);else if(voiceRecorder.state==='recording')voiceRecorder.finish();else{voiceRecorder.cancel();$('voice-state').textContent='Cancelled. Ready to record again.';}};
  fetch('/api/transcribe').then(r=>r.ok?r.json():Promise.reject()).then(config=>{if(voiceRecorder.state==='idle')$('voice-state').textContent=config.ready?'Groq Whisper Large V3 · ready to record.':'Groq voice setup is pending. Typed commands are available below.';}).catch(()=>{if(voiceRecorder.state==='idle')$('voice-state').textContent='Voice service unavailable. Typed commands are available below.';});
 }else{$('listen').disabled=true;$('listen-label').textContent='Recording unavailable';$('voice-state').textContent='Open this site in a browser with microphone recording support.';}
-function spaceKey(event) {
- return event.code === 'Space' || event.key === ' ';
-}
 document.addEventListener('keydown', event => {
- if (!spaceKey(event) || event.ctrlKey || event.metaKey || event.altKey || $('guide').open ||
-     event.target.closest?.('input, textarea, select, [contenteditable]:not([contenteditable="false"]), button:not(#listen), a, summary')) return;
- if (typedBusy || !voiceRecorder) return;
- if (voiceRecorder.state === 'idle' || voiceRecorder.capture?.shortcut === 'Space') {
-  event.preventDefault();
- }
- if (!event.repeat && voiceRecorder.state === 'idle') voiceRecorder.start(activeColor, 'Space');
+ if (event.key.toLowerCase() !== recordShortcut || event.repeat || event.isComposing ||
+     event.ctrlKey || event.metaKey || event.altKey || $('guide').open ||
+     event.target.closest?.('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return;
+ if (typedBusy || voiceRecorder?.state !== 'idle') return;
+ event.preventDefault();
+ voiceRecorder.start(activeColor, recordShortcut);
 });
 document.addEventListener('keyup', event => {
- if (!spaceKey(event) || voiceRecorder?.capture?.shortcut !== 'Space') return;
- event.preventDefault();
- voiceRecorder.release('Space');
+ if (event.key.toLowerCase() === recordShortcut) releaseRecordShortcut();
 });
-function releaseKeys() {
- voiceRecorder?.release('Space');
+function releaseRecordShortcut() {
+ voiceRecorder?.release(recordShortcut);
 }
-window.addEventListener('blur',releaseKeys);document.addEventListener('visibilitychange',()=>{if(document.hidden)releaseKeys();});
+window.addEventListener('blur',releaseRecordShortcut);document.addEventListener('visibilitychange',()=>{if(document.hidden)releaseRecordShortcut();});
 window.addEventListener('pagehide',()=>{voiceRecorder?.dispose();typedController?.abort();});updateColorUI();render();

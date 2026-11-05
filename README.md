@@ -10,9 +10,9 @@ Record up to 60 seconds, then click Finish & transcribe. Audio is sent to Groq; 
 
 ## Short placement and color controls
 
-Click Start recording and Stop recording, or hold Space and release to submit. The shortcut works outside text fields and ordinary interactive controls. Leaving the window releases a held Space key; unloading the page cancels recording.
+Click Start recording and Stop recording, or hold R and release to submit. The shortcut is inactive in text fields. Leaving the window releases a held R key; unloading the page cancels recording.
 
-Set an active color by saying “let’s do black next” or “switch to white”, or by clicking a color. The active color persists for later commands on the page. A color named for one piece overrides the active color for that piece alone. If no color is established, a placement needs an explicit color. A recording uses the active color at its start and applies any spoken switches in order. Placements apply after recording ends.
+Set an active color by saying “let’s do black next” or “switch to white”. The active color persists for later commands on the page. A color named for one piece overrides the active color for that piece alone. If no color is established, a placement needs an explicit color. A recording uses the active color at its start and applies any spoken switches in order. Placements apply after recording ends.
 
 ## Commands
 
