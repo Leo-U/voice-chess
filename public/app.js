@@ -19,6 +19,9 @@ const names={k:'king',q:'queen',r:'rook',b:'bishop',n:'knight',p:'pawn'};
 const recordShortcut = 'r';
 let state=parseFen(START),selected='N',flipped=false,last=[],undo=[],redo=[];
 let activeColor = null;let voiceRecorder;let typedBusy=false;let typedController;
+const commandInput = $('command');
+let voiceDraft = null;
+const stripVoicePunctuation = text => text.replace(/[,.]/g, '');
 try{const saved=localStorage.getItem('voice-chess-groq-position');if(saved)state=parseFen(saved);}catch{}
 function pieceName(p){return (p===p.toUpperCase()?'White ':'Black ')+names[p.toLowerCase()];}
 function feedback(msg,error=false){$('feedback').textContent=msg;$('feedback').classList.toggle('error',error);}
@@ -57,7 +60,7 @@ function applyCommands(commands,text){if(!commands.length)return;if(commands.len
 async function interpretText(text,color,signal,{spoken=false}={}){
  // Keep existing explicit editor operations; all placements go through the LLM.
  try{const commands=parseCommands(text,color);if(commands.length&&commands.every(c=>c.type!=='place'))return {status:'placements',commands,legacy:true};}catch{}
- const commandText=spoken?text.replace(/[,.]/g,''):text;
+ const commandText=spoken?stripVoicePunctuation(text):text;
  if(!commandText.trim())return {status:'none',message:'No spoken command recognized.'};
  const response=await fetch('/api/interpret',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:commandText,color}),signal});
  const data=await response.json();if(!response.ok)throw Error(data.error||'Interpretation failed.');return data;
@@ -81,20 +84,27 @@ function applyInterpretation(result, text) {
   feedback(descriptions.join(' · ') + '.');
  }
 }
-async function execute(text, color = activeColor) {
+async function execute(text, color = activeColor, options) {
  if(typedBusy||voiceRecorder&&voiceRecorder.state!=='idle'){feedback('Wait for the current command to finish, or cancel it.',true);return;}
  if(!text.trim())return;
  typedBusy=true;typedController=new AbortController();const timer=globalThis.setTimeout(()=>typedController.abort(),20000);
  $('command-form').querySelector('button').disabled=true;$('listen').disabled=true;feedback('Interpreting your placement…');
- try{applyInterpretation(await interpretText(text,color,typedController.signal),text);}catch(e){feedback((e.name==='AbortError'?'Interpretation timed out. Please try again.':e.message)+' No pieces changed.',true);}
+ try{applyInterpretation(await interpretText(text,color,typedController.signal,options),text);}catch(e){feedback((e.name==='AbortError'?'Interpretation timed out. Please try again.':e.message)+' No pieces changed.',true);}
  finally{globalThis.clearTimeout(timer);typedBusy=false;typedController=null;$('command-form').querySelector('button').disabled=false;$('listen').disabled=!voiceRecorder;}
 }
-$('command-form').onsubmit=e=>{e.preventDefault();execute($('command').value);};document.querySelectorAll('[data-command]').forEach(b=>b.onclick=()=>{$('command').value=b.dataset.command;execute(b.dataset.command);});
+commandInput.oninput=()=>{voiceDraft=null;};
+$('command-form').onsubmit=e=>{
+ e.preventDefault();
+ if(voiceDraft!==null&&commandInput.value===stripVoicePunctuation(voiceDraft))execute(voiceDraft,activeColor,{spoken:true});
+ else execute(commandInput.value);
+};
+document.querySelectorAll('[data-command]').forEach(b=>b.onclick=()=>{voiceDraft=null;commandInput.value=b.dataset.command;execute(b.dataset.command);});
 $('help').onclick=()=>$('guide').showModal();$('close-guide').onclick=()=>$('guide').close();$('guide').onclick=e=>{if(e.target===$('guide')){const r=$('guide').getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)$('guide').close();}};
 document.addEventListener('keydown',e=>{if(e.target.matches('input,textarea,select'))return;if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();restore(e.shiftKey?'redo':'undo');}});
 function voiceError(error){
  const message=error.name==='NotAllowedError'?'Microphone access was denied. Allow this site to use your microphone in browser settings.':error.name==='NotFoundError'?'No microphone found. Connect one and try again.':error.name==='TimeoutError'?'Transcription timed out. Please try again.':error.message;
- $('voice-state').textContent=message;feedback(message+' No pieces changed.',true);
+ $('voice-state').textContent=voiceRecorder?.state==='interpreting'&&voiceDraft!==null?'Heard: “'+voiceDraft+'”':message;
+ feedback(message+' No pieces changed.',true);
 }
 if(navigator.mediaDevices?.getUserMedia&&window.MediaRecorder){
  voiceRecorder=new VoiceRecorder({
@@ -102,14 +112,23 @@ if(navigator.mediaDevices?.getUserMedia&&window.MediaRecorder){
   Recorder:window.MediaRecorder,
   async ready(){const response=await fetch('/api/transcribe',{signal:AbortSignal.timeout(10000)});if(!response.ok)throw Error('Voice service is unavailable. Please try again later.');const config=await response.json();if(!config.ready)throw Error('Groq voice setup is pending. Typed commands are available below.');},
   async transcribe(blob,signal){const form=new FormData();form.set('audio',blob,blob.type.includes('mp4')?'command.mp4':'command.webm');const response=await fetch('/api/transcribe',{method:'POST',body:form,signal});const data=await response.json();if(!response.ok)throw Error(data.error||'Transcription failed.');return data.text;},
-  interpret(text,color,signal){$('command').value=text;$('voice-state').textContent='Heard: “'+text+'” · interpreting placement…';return interpretText(text,color,signal,{spoken:true});},
-  onTranscript(text,color,result){$('command').value=text;$('voice-state').textContent='Heard: “'+text+'”';applyInterpretation(result,text);},
+  interpret(text,color,signal){
+   voiceDraft=text;
+   commandInput.value=stripVoicePunctuation(text);
+   $('voice-state').textContent='Heard: “'+text+'” · interpreting placement…';
+   return interpretText(text,color,signal,{spoken:true});
+  },
+  onTranscript(text,color,result){$('voice-state').textContent='Heard: “'+text+'”';applyInterpretation(result,text);},
   onError:voiceError,
   onState(mode,capture){
    $('listen').disabled=false;
    $('listen').classList.toggle('active',mode==='recording');$('listen').setAttribute('aria-pressed',String(mode==='recording'));
    $('listen-label').textContent={idle:'Start recording',recording:'Stop recording',requesting:'Cancel',stopping:'Cancel',transcribing:'Cancel transcription',interpreting:'Cancel interpretation'}[mode];
-   if(mode==='requesting')$('voice-state').textContent='Opening microphone…';
+   if(mode==='requesting'){
+    if(voiceDraft!==null&&commandInput.value===stripVoicePunctuation(voiceDraft))commandInput.value='';
+    voiceDraft=null;
+    $('voice-state').textContent='Opening microphone…';
+   }
    if(mode==='recording')$('voice-state').textContent=capture.shortcut ? 'Recording… release R to finish.' : 'Recording… click Stop recording when done.';
    if(mode==='stopping')$('voice-state').textContent='Finishing the recording…';
    if(mode==='interpreting')$('voice-state').textContent='Interpreting your placement…';
