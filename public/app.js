@@ -54,10 +54,12 @@ for(let id of ['ep','half','full'])$(id).onchange=()=>{try{let s=clone(state);s[
 $('fen-form').onsubmit=e=>{e.preventDefault();try{const s=parseFen($('fen').value);change(v=>Object.assign(v,s),[],'Position imported.');$('fen-status').textContent='Position imported successfully.';$('fen-status').classList.remove('error');}catch(err){$('fen-status').textContent=err.message;$('fen-status').classList.add('error');}};
 $('copy').onclick=async()=>{try{await navigator.clipboard.writeText(toFen(state));$('fen-status').textContent='FEN copied to clipboard.';$('fen-status').classList.remove('error');}catch{$('fen').focus();$('fen').select();$('fen-status').textContent='Select and copy the FEN above.';}};
 function applyCommands(commands,text){if(!commands.length)return;if(commands.length>1&&commands.some(c=>['undo','redo','flip','clear','start'].includes(c.type)))throw Error('Use board commands individually.');let c=commands[0];if(c.type==='undo'||c.type==='redo'){restore(c.type);return;}if(c.type==='flip'){$('flip').click();feedback('Board flipped.');return;}if(c.type==='clear'){$('clear').click();return;}if(c.type==='start'){$('start').click();return;}let squares=[];change(s=>{applyEdits(s,commands);for(const c of commands){if(c.type==='move')squares.push(c.from,c.to);else if(c.square)squares.push(c.square);}},squares,commands.length>1?`${commands.length} edits applied.`:text+' ✓');}
-async function interpretText(text,color,signal){
+async function interpretText(text,color,signal,{spoken=false}={}){
  // Keep existing explicit editor operations; all placements go through the LLM.
  try{const commands=parseCommands(text,color);if(commands.length&&commands.every(c=>c.type!=='place'))return {status:'placements',commands,legacy:true};}catch{}
- const response=await fetch('/api/interpret',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,color}),signal});
+ const commandText=spoken?text.replace(/[,.]/g,''):text;
+ if(!commandText.trim())return {status:'none',message:'No spoken command recognized.'};
+ const response=await fetch('/api/interpret',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:commandText,color}),signal});
  const data=await response.json();if(!response.ok)throw Error(data.error||'Interpretation failed.');return data;
 }
 function applyInterpretation(result, text) {
@@ -100,7 +102,7 @@ if(navigator.mediaDevices?.getUserMedia&&window.MediaRecorder){
   Recorder:window.MediaRecorder,
   async ready(){const response=await fetch('/api/transcribe',{signal:AbortSignal.timeout(10000)});if(!response.ok)throw Error('Voice service is unavailable. Please try again later.');const config=await response.json();if(!config.ready)throw Error('Groq voice setup is pending. Typed commands are available below.');},
   async transcribe(blob,signal){const form=new FormData();form.set('audio',blob,blob.type.includes('mp4')?'command.mp4':'command.webm');const response=await fetch('/api/transcribe',{method:'POST',body:form,signal});const data=await response.json();if(!response.ok)throw Error(data.error||'Transcription failed.');return data.text;},
-  interpret(text,color,signal){$('command').value=text;$('voice-state').textContent='Heard: “'+text+'” · interpreting placement…';return interpretText(text,color,signal);},
+  interpret(text,color,signal){$('command').value=text;$('voice-state').textContent='Heard: “'+text+'” · interpreting placement…';return interpretText(text,color,signal,{spoken:true});},
   onTranscript(text,color,result){$('command').value=text;$('voice-state').textContent='Heard: “'+text+'”';applyInterpretation(result,text);},
   onError:voiceError,
   onState(mode,capture){
